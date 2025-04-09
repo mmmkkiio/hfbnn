@@ -1,0 +1,1145 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>游戏王同调时代对战</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;700&display=swap');
+        
+        body {
+            font-family: 'Noto Sans SC', sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: white;
+            min-height: 100vh;
+        }
+        
+        .card {
+            transition: all 0.3s ease;
+            transform-style: preserve-3d;
+            perspective: 1000px;
+        }
+        
+        .card:hover {
+            transform: translateY(-10px) scale(1.05);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+        }
+        
+        .card-image {
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: center;
+        }
+        
+        .field-slot {
+            border: 2px dashed rgba(255, 255, 255, 0.2);
+            transition: all 0.3s ease;
+        }
+        
+        .field-slot:hover {
+            border-color: rgba(255, 255, 255, 0.5);
+            background-color: rgba(255, 255, 255, 0.05);
+        }
+        
+        .lp-bar {
+            height: 30px;
+            transition: width 0.5s ease;
+        }
+        
+        .damage-animation {
+            animation: damage 0.5s ease;
+        }
+        
+        @keyframes damage {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.2); }
+            100% { transform: scale(1); }
+        }
+        
+        .synchro-summon {
+            animation: synchro 1s ease;
+        }
+        
+        @keyframes synchro {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.5); opacity: 0.7; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        
+        .character-select {
+            transition: all 0.3s ease;
+        }
+        
+        .character-select:hover {
+            transform: scale(1.05);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+        }
+        
+        .selected-character {
+            border: 3px solid #f59e0b;
+            transform: scale(1.05);
+        }
+        
+        .ai-thinking {
+            animation: thinking 1.5s infinite;
+        }
+        
+        @keyframes thinking {
+            0% { opacity: 0.5; }
+            50% { opacity: 1; }
+            100% { opacity: 0.5; }
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col">
+    <!-- 主游戏容器 -->
+    <div class="container mx-auto px-4 py-8 flex-grow">
+        <!-- 游戏标题 -->
+        <div class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-yellow-400 mb-2">游戏王 同调时代</h1>
+            <p class="text-xl text-gray-300">与动漫角色进行决斗！</p>
+        </div>
+        
+        <!-- 游戏主界面 -->
+        <div id="game-container" class="hidden">
+            <!-- 对手区域 -->
+            <div class="mb-8">
+                <div class="flex justify-between items-center mb-4">
+                    <div class="flex items-center">
+                        <img id="opponent-avatar" src="https://images.ygoprodeck.com/images/cards_cropped/10000000.jpg" class="w-16 h-16 rounded-full border-2 border-gray-600 mr-4">
+                        <div>
+                            <h3 id="opponent-name" class="text-xl font-bold text-red-400">对手</h3>
+                            <div class="flex items-center">
+                                <span class="mr-2">LP:</span>
+                                <div class="bg-gray-800 rounded-full w-48 h-6 overflow-hidden">
+                                    <div id="opponent-lp-bar" class="lp-bar bg-red-500 rounded-full h-full" style="width: 100%"></div>
+                                </div>
+                                <span id="opponent-lp" class="ml-2 font-bold">8000</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="opponent-thinking" class="ai-thinking bg-blue-500 text-white px-4 py-2 rounded-full hidden">
+                        <i class="fas fa-brain mr-2"></i>思考中...
+                    </div>
+                </div>
+                
+                <!-- 对手场地 -->
+                <div class="bg-gray-900 bg-opacity-70 rounded-lg p-4 mb-4">
+                    <div class="grid grid-cols-5 gap-2 mb-2">
+                        <!-- 对手怪兽区 -->
+                        <div class="field-slot h-24 rounded" id="opponent-monster-1"></div>
+                        <div class="field-slot h-24 rounded" id="opponent-monster-2"></div>
+                        <div class="field-slot h-24 rounded" id="opponent-monster-3"></div>
+                        <div class="field-slot h-24 rounded" id="opponent-monster-4"></div>
+                        <div class="field-slot h-24 rounded" id="opponent-monster-5"></div>
+                    </div>
+                    <div class="grid grid-cols-5 gap-2">
+                        <!-- 对手魔法陷阱区 -->
+                        <div class="field-slot h-16 rounded" id="opponent-spell-1"></div>
+                        <div class="field-slot h-16 rounded" id="opponent-spell-2"></div>
+                        <div class="field-slot h-16 rounded" id="opponent-spell-3"></div>
+                        <div class="field-slot h-16 rounded" id="opponent-spell-4"></div>
+                        <div class="field-slot h-16 rounded" id="opponent-spell-5"></div>
+                    </div>
+                </div>
+                
+                <!-- 对手额外卡组和墓地 -->
+                <div class="flex justify-between mb-4">
+                    <div class="flex">
+                        <div class="mr-4">
+                            <div class="text-sm text-gray-400 mb-1">额外卡组</div>
+                            <div class="flex">
+                                <div id="opponent-extra-deck" class="w-10 h-14 bg-gray-800 rounded flex items-center justify-center text-xs">15</div>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="text-sm text-gray-400 mb-1">墓地</div>
+                            <div class="flex">
+                                <div id="opponent-graveyard" class="w-10 h-14 bg-gray-800 rounded flex items-center justify-center text-xs">0</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="flex">
+                        <div class="mr-4">
+                            <div class="text-sm text-gray-400 mb-1">除外区</div>
+                            <div class="flex">
+                                <div id="opponent-banished" class="w-10 h-14 bg-gray-800 rounded flex items-center justify-center text-xs">0</div>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="text-sm text-gray-400 mb-1">卡组</div>
+                            <div class="flex">
+                                <div id="opponent-deck" class="w-10 h-14 bg-gray-800 rounded flex items-center justify-center text-xs">40</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 战斗区域 -->
+            <div class="flex justify-center mb-8">
+                <div class="bg-gray-800 bg-opacity-50 rounded-lg p-4 w-32 flex flex-col items-center">
+                    <div class="text-sm mb-2">战斗阶段</div>
+                    <div id="phase-indicator" class="text-xl font-bold text-yellow-400">准备阶段</div>
+                </div>
+            </div>
+            
+            <!-- 玩家区域 -->
+            <div>
+                <!-- 玩家信息 -->
+                <div class="flex justify-between items-center mb-4">
+                    <div class="flex items-center">
+                        <img id="player-avatar" src="https://images.ygoprodeck.com/images/cards_cropped/10000000.jpg" class="w-16 h-16 rounded-full border-2 border-blue-500 mr-4">
+                        <div>
+                            <h3 id="player-name" class="text-xl font-bold text-blue-400">玩家</h3>
+                            <div class="flex items-center">
+                                <span class="mr-2">LP:</span>
+                                <div class="bg-gray-800 rounded-full w-48 h-6 overflow-hidden">
+                                    <div id="player-lp-bar" class="lp-bar bg-blue-500 rounded-full h-full" style="width: 100%"></div>
+                                </div>
+                                <span id="player-lp" class="ml-2 font-bold">8000</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="flex space-x-2">
+                        <button id="end-phase-btn" class="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded">
+                            <i class="fas fa-forward mr-2"></i>结束阶段
+                        </button>
+                        <button id="surrender-btn" class="bg-red-700 hover:bg-red-600 text-white px-4 py-2 rounded">
+                            <i class="fas fa-flag mr-2"></i>投降
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- 玩家场地 -->
+                <div class="bg-gray-900 bg-opacity-70 rounded-lg p-4 mb-4">
+                    <div class="grid grid-cols-5 gap-2 mb-2">
+                        <!-- 玩家怪兽区 -->
+                        <div class="field-slot h-24 rounded" id="player-monster-1"></div>
+                        <div class="field-slot h-24 rounded" id="player-monster-2"></div>
+                        <div class="field-slot h-24 rounded" id="player-monster-3"></div>
+                        <div class="field-slot h-24 rounded" id="player-monster-4"></div>
+                        <div class="field-slot h-24 rounded" id="player-monster-5"></div>
+                    </div>
+                    <div class="grid grid-cols-5 gap-2">
+                        <!-- 玩家魔法陷阱区 -->
+                        <div class="field-slot h-16 rounded" id="player-spell-1"></div>
+                        <div class="field-slot h-16 rounded" id="player-spell-2"></div>
+                        <div class="field-slot h-16 rounded" id="player-spell-3"></div>
+                        <div class="field-slot h-16 rounded" id="player-spell-4"></div>
+                        <div class="field-slot h-16 rounded" id="player-spell-5"></div>
+                    </div>
+                </div>
+                
+                <!-- 玩家额外卡组和墓地 -->
+                <div class="flex justify-between mb-4">
+                    <div class="flex">
+                        <div class="mr-4">
+                            <div class="text-sm text-gray-400 mb-1">额外卡组</div>
+                            <div class="flex">
+                                <div id="player-extra-deck" class="w-10 h-14 bg-gray-800 rounded flex items-center justify-center text-xs">15</div>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="text-sm text-gray-400 mb-1">墓地</div>
+                            <div class="flex">
+                                <div id="player-graveyard" class="w-10 h-14 bg-gray-800 rounded flex items-center justify-center text-xs">0</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="flex">
+                        <div class="mr-4">
+                            <div class="text-sm text-gray-400 mb-1">除外区</div>
+                            <div class="flex">
+                                <div id="player-banished" class="w-10 h-14 bg-gray-800 rounded flex items-center justify-center text-xs">0</div>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="text-sm text-gray-400 mb-1">卡组</div>
+                            <div class="flex">
+                                <div id="player-deck" class="w-10 h-14 bg-gray-800 rounded flex items-center justify-center text-xs">40</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 玩家手牌 -->
+                <div class="mb-8">
+                    <div class="text-sm text-gray-400 mb-2">手牌</div>
+                    <div id="player-hand" class="flex flex-wrap gap-2 min-h-20">
+                        <!-- 手牌将在这里动态添加 -->
+                    </div>
+                </div>
+                
+                <!-- 玩家操作按钮 -->
+                <div class="flex justify-center space-x-4">
+                    <button id="draw-btn" class="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-bold">
+                        <i class="fas fa-hand-paper mr-2"></i>抽卡
+                    </button>
+                    <button id="summon-btn" class="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-lg font-bold">
+                        <i class="fas fa-star mr-2"></i>召唤
+                    </button>
+                    <button id="synchro-btn" class="bg-yellow-600 hover:bg-yellow-700 text-white px-6 py-3 rounded-lg font-bold">
+                        <i class="fas fa-atom mr-2"></i>同调召唤
+                    </button>
+                    <button id="attack-btn" class="bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-lg font-bold">
+                        <i class="fas fa-bolt mr-2"></i>攻击
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 角色选择界面 -->
+        <div id="character-select" class="max-w-4xl mx-auto">
+            <h2 class="text-2xl font-bold text-center mb-6 text-yellow-400">选择你的对手</h2>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <!-- 游星 -->
+                <div class="character-select bg-gray-800 rounded-lg overflow-hidden cursor-pointer" data-character="yusei">
+                    <div class="h-48 bg-gradient-to-b from-blue-900 to-gray-800 flex items-center justify-center">
+                        <img src="https://images.ygoprodeck.com/images/cards_cropped/10000000.jpg" class="h-full object-cover">
+                    </div>
+                    <div class="p-4">
+                        <h3 class="text-xl font-bold text-blue-400 mb-2">不动游星</h3>
+                        <p class="text-gray-300 text-sm mb-3">使用"废品"和"速攻"卡组，擅长同调召唤和快速展开。</p>
+                        <div class="flex justify-between text-xs text-gray-400">
+                            <span><i class="fas fa-brain mr-1"></i> 策略型</span>
+                            <span><i class="fas fa-bolt mr-1"></i> 速攻</span>
+                            <span><i class="fas fa-sync-alt mr-1"></i> 同调</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 杰克 -->
+                <div class="character-select bg-gray-800 rounded-lg overflow-hidden cursor-pointer" data-character="jack">
+                    <div class="h-48 bg-gradient-to-b from-red-900 to-gray-800 flex items-center justify-center">
+                        <img src="https://images.ygoprodeck.com/images/cards_cropped/10000010.jpg" class="h-full object-cover">
+                    </div>
+                    <div class="p-4">
+                        <h3 class="text-xl font-bold text-red-400 mb-2">杰克·阿特拉斯</h3>
+                        <p class="text-gray-300 text-sm mb-3">使用"红莲魔"卡组，以强力怪兽和直接攻击为主。</p>
+                        <div class="flex justify-between text-xs text-gray-400">
+                            <span><i class="fas fa-crown mr-1"></i> 王者</span>
+                            <span><i class="fas fa-fist-raised mr-1"></i> 强攻</span>
+                            <span><i class="fas fa-dragon mr-1"></i> 龙族</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 克罗 -->
+                <div class="character-select bg-gray-800 rounded-lg overflow-hidden cursor-pointer" data-character="crow">
+                    <div class="h-48 bg-gradient-to-b from-black to-gray-800 flex items-center justify-center">
+                        <img src="https://images.ygoprodeck.com/images/cards_cropped/10000020.jpg" class="h-full object-cover">
+                    </div>
+                    <div class="p-4">
+                        <h3 class="text-xl font-bold text-gray-400 mb-2">克罗·霍根</h3>
+                        <p class="text-gray-300 text-sm mb-3">使用"黑羽"卡组，擅长快速特召和连续攻击。</p>
+                        <div class="flex justify-between text-xs text-gray-400">
+                            <span><i class="fas fa-feather-alt mr-1"></i> 黑羽</span>
+                            <span><i class="fas fa-running mr-1"></i> 速攻</span>
+                            <span><i class="fas fa-chess-rook mr-1"></i> 防御</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 十六夜 -->
+                <div class="character-select bg-gray-800 rounded-lg overflow-hidden cursor-pointer" data-character="aki">
+                    <div class="h-48 bg-gradient-to-b from-purple-900 to-gray-800 flex items-center justify-center">
+                        <img src="https://images.ygoprodeck.com/images/cards_cropped/10000030.jpg" class="h-full object-cover">
+                    </div>
+                    <div class="p-4">
+                        <h3 class="text-xl font-bold text-purple-400 mb-2">十六夜亚纪</h3>
+                        <p class="text-gray-300 text-sm mb-3">使用"植物"卡组，擅长控制场和墓地回收。</p>
+                        <div class="flex justify-between text-xs text-gray-400">
+                            <span><i class="fas fa-leaf mr-1"></i> 植物</span>
+                            <span><i class="fas fa-magic mr-1"></i> 控制</span>
+                            <span><i class="fas fa-recycle mr-1"></i> 回收</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 龙亚 -->
+                <div class="character-select bg-gray-800 rounded-lg overflow-hidden cursor-pointer" data-character="ryoga">
+                    <div class="h-48 bg-gradient-to-b from-green-900 to-gray-800 flex items-center justify-center">
+                        <img src="https://images.ygoprodeck.com/images/cards_cropped/10000040.jpg" class="h-full object-cover">
+                    </div>
+                    <div class="p-4">
+                        <h3 class="text-xl font-bold text-green-400 mb-2">龙亚</h3>
+                        <p class="text-gray-300 text-sm mb-3">使用"变形斗士"卡组，擅长装备和变形战术。</p>
+                        <div class="flex justify-between text-xs text-gray-400">
+                            <span><i class="fas fa-robot mr-1"></i> 机械</span>
+                            <span><i class="fas fa-puzzle-piece mr-1"></i> 变形</span>
+                            <span><i class="fas fa-tools mr-1"></i> 装备</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 鬼柳 -->
+                <div class="character-select bg-gray-800 rounded-lg overflow-hidden cursor-pointer" data-character="kyosuke">
+                    <div class="h-48 bg-gradient-to-b from-orange-900 to-gray-800 flex items-center justify-center">
+                        <img src="https://images.ygoprodeck.com/images/cards_cropped/10000050.jpg" class="h-full object-cover">
+                    </div>
+                    <div class="p-4">
+                        <h3 class="text-xl font-bold text-orange-400 mb-2">鬼柳京介</h3>
+                        <p class="text-gray-300 text-sm mb-3">使用"永火"卡组，擅长空手牌战术和连续特召。</p>
+                        <div class="flex justify-between text-xs text-gray-400">
+                            <span><i class="fas fa-skull mr-1"></i> 永火</span>
+                            <span><i class="fas fa-fire mr-1"></i> 爆发</span>
+                            <span><i class="fas fa-hand-paper mr-1"></i> 空手</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="mt-8 text-center">
+                <button id="start-duel-btn" class="bg-yellow-600 hover:bg-yellow-700 text-white px-8 py-3 rounded-lg font-bold text-xl">
+                    <i class="fas fa-play mr-2"></i>开始决斗
+                </button>
+            </div>
+        </div>
+        
+        <!-- 游戏结束弹窗 -->
+        <div id="game-over-modal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center hidden z-50">
+            <div class="bg-gray-900 rounded-lg p-8 max-w-md w-full">
+                <h2 id="game-over-title" class="text-3xl font-bold text-center mb-4"></h2>
+                <p id="game-over-message" class="text-xl text-center mb-6"></p>
+                <div class="flex justify-center space-x-4">
+                    <button id="rematch-btn" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg">
+                        <i class="fas fa-redo mr-2"></i>再战一次
+                    </button>
+                    <button id="back-to-menu-btn" class="bg-gray-600 hover:bg-gray-700 text-white px-6 py-2 rounded-lg">
+                        <i class="fas fa-home mr-2"></i>返回菜单
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 卡牌详情弹窗 -->
+        <div id="card-detail-modal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center hidden z-50">
+            <div class="bg-gray-900 rounded-lg p-6 max-w-md w-full">
+                <div class="flex mb-4">
+                    <div id="detail-card-image" class="w-32 h-48 bg-gray-800 rounded mr-4"></div>
+                    <div class="flex-1">
+                        <h3 id="detail-card-name" class="text-xl font-bold mb-2"></h3>
+                        <div class="text-sm mb-2">
+                            <span id="detail-card-type" class="inline-block bg-blue-600 text-white px-2 py-1 rounded mr-2"></span>
+                            <span id="detail-card-attribute" class="inline-block bg-purple-600 text-white px-2 py-1 rounded"></span>
+                        </div>
+                        <div id="detail-card-stats" class="text-sm mb-2"></div>
+                        <div id="detail-card-level" class="flex mb-2"></div>
+                    </div>
+                </div>
+                <div class="bg-gray-800 rounded p-4 mb-4">
+                    <p id="detail-card-desc" class="text-sm"></p>
+                </div>
+                <div class="flex justify-end">
+                    <button id="close-detail-btn" class="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded">
+                        <i class="fas fa-times mr-2"></i>关闭
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 页脚 -->
+    <footer class="bg-gray-900 bg-opacity-70 py-4 text-center text-gray-400 text-sm">
+        <p>游戏王同调时代对战 - 非官方游戏 | 卡图资源来自YGOPRODeck</p>
+    </footer>
+
+    <script>
+        // 游戏状态
+        const gameState = {
+            player: {
+                name: "玩家",
+                lp: 8000,
+                deck: [],
+                hand: [],
+                extraDeck: [],
+                graveyard: [],
+                banished: [],
+                monsters: [null, null, null, null, null],
+                spells: [null, null, null, null, null],
+                selectedCard: null,
+                selectedMonsterSlot: null,
+                selectedSpellSlot: null
+            },
+            opponent: {
+                name: "对手",
+                lp: 8000,
+                deck: [],
+                hand: [],
+                extraDeck: [],
+                graveyard: [],
+                banished: [],
+                monsters: [null, null, null, null, null],
+                spells: [null, null, null, null, null],
+                character: null
+            },
+            turn: "player",
+            phase: "draw",
+            selectedOpponent: null,
+            gameStarted: false
+        };
+        
+        // 卡牌数据库 (简化版)
+        const cardDatabase = {
+            // 游星卡组
+            yusei: {
+                deck: [
+                    { id: 83994433, name: "废品同调士", type: "怪兽", attribute: "光", level: 3, atk: 1300, def: 500, desc: "调整：这张卡召唤成功时，可以把自己墓地存在的1只2星以下的怪兽表侧守备表示特殊召唤。" },
+                    { id: 26202165, name: "速攻同调士", type: "怪兽", attribute: "风", level: 5, atk: 700, def: 1400, desc: "调整：这张卡可以把手卡1只怪兽送去墓地，从手卡特殊召唤。" },
+                    { id: 44508094, name: "喷气同调士", type: "怪兽", attribute: "炎", level: 1, atk: 500, def: 0, desc: "调整：这张卡被战斗破坏送去墓地时，可以从卡组把1只「废品」怪兽加入手卡。" },
+                    { id: 63977008, name: "废品战士", type: "怪兽", attribute: "地", level: 5, atk: 2300, def: 1300, desc: "同调：调整＋调整以外的怪兽1只以上。这张卡同调召唤成功时，这张卡的攻击力上升自己场上存在的2星以下的怪兽的攻击力的合计数值。" },
+                    { id: 24696097, name: "废品破坏王", type: "怪兽", attribute: "地", level: 8, atk: 2600, def: 2500, desc: "同调：调整＋调整以外的怪兽1只以上。这张卡同调召唤成功时，可以选择最多有作为这张卡的同调素材的怪兽数量的场上存在的卡破坏。" },
+                    { id: 74586817, name: "星尘龙", type: "怪兽", attribute: "风", level: 8, atk: 2500, def: 2000, desc: "同调：调整＋调整以外的怪兽1只以上。持有「把场上的卡破坏的效果」的魔法·陷阱·效果怪兽的效果发动时，可以把这张卡解放让那个发动无效并破坏。" },
+                    { id: 25862681, name: "废品守卫者", type: "怪兽", attribute: "地", level: 6, atk: 1400, def: 2800, desc: "同调：调整＋调整以外的怪兽1只以上。1回合1次，可以选择对方场上表侧表示存在的1只怪兽，那只怪兽的攻击力下降自己墓地存在的名字带有「废品」的怪兽数量×100的数值。" },
+                    { id: 66818682, name: "废品狂战士", type: "怪兽", attribute: "地", level: 7, atk: 2700, def: 1800, desc: "同调：调整＋调整以外的怪兽1只以上。这张卡攻击的场合，对方直到伤害步骤结束时不能发动魔法·陷阱卡。" },
+                    { id: 34206604, name: "废品弓手", type: "怪兽", attribute: "地", level: 6, atk: 2000, def: 1000, desc: "同调：调整＋调整以外的怪兽1只以上。1回合1次，可以选择对方场上存在的1只怪兽，那只怪兽的控制权直到结束阶段时得到。" },
+                    { id: 70902743, name: "废品战士", type: "怪兽", attribute: "地", level: 5, atk: 2300, def: 1300, desc: "同调：调整＋调整以外的怪兽1只以上。这张卡同调召唤成功时，这张卡的攻击力上升自己场上存在的2星以下的怪兽的攻击力的合计数值。" },
+                    { id: 73580471, name: "废品破坏者", type: "怪兽", attribute: "地", level: 4, atk: 1800, def: 1000, desc: "这张卡召唤·特殊召唤成功时，可以选择自己墓地存在的1只名字带有「废品」的怪兽特殊召唤。" },
+                    { id: 19665973, name: "废品收集者", type: "怪兽", attribute: "地", level: 3, atk: 1000, def: 1000, desc: "这张卡被战斗破坏送去墓地时，可以从卡组把1只名字带有「废品」的怪兽加入手卡。" },
+                    { id: 24094653, name: "废品转换者", type: "怪兽", attribute: "地", level: 2, atk: 600, def: 600, desc: "这张卡被战斗破坏送去墓地时，可以从卡组把1只名字带有「废品」的怪兽特殊召唤。" },
+                    { id: 57774843, name: "废品防御者", type: "怪兽", attribute: "地", level: 3, atk: 500, def: 1800, desc: "这张卡被战斗破坏送去墓地时，可以从卡组把1只名字带有「废品」的怪兽加入手卡。" },
+                    { id: 31314549, name: "废品前锋", type: "怪兽", attribute: "地", level: 3, atk: 1500, def: 1000, desc: "这张卡召唤成功时，可以从手卡把1只名字带有「废品」的怪兽特殊召唤。" },
+                    { id: 57774843, name: "废品防御者", type: "怪兽", attribute: "地", level: 3, atk: 500, def: 1800, desc: "这张卡被战斗破坏送去墓地时，可以从卡组把1只名字带有「废品」的怪兽加入手卡。" },
+                    { id: 31314549, name: "废品前锋", type: "怪兽", attribute: "地", level: 3, atk: 1500, def: 1000, desc: "这张卡召唤成功时，可以从手卡把1只名字带有「废品」的怪兽特殊召唤。" },
+                    { id: 19665973, name: "废品收集者", type: "怪兽", attribute: "地", level: 3, atk: 1000, def: 1000, desc: "这张卡被战斗破坏送去墓地时，可以从卡组把1只名字带有「废品」的怪兽加入手卡。" },
+                    { id: 24094653, name: "废品转换者", type: "怪兽", attribute: "地", level: 2, atk: 600, def: 600, desc: "这张卡被战斗破坏送去墓地时，可以从卡组把1只名字带有「废品」的怪兽特殊召唤。" },
+                    { id: 73580471, name: "废品破坏者", type: "怪兽", attribute: "地", level: 4, atk: 1800, def: 1000, desc: "这张卡召唤·特殊召唤成功时，可以选择自己墓地存在的1只名字带有「废品」的怪兽特殊召唤。" },
+                    { id: 70902743, name: "废品战士", type: "怪兽", attribute: "地", level: 5, atk: 2300, def: 1300, desc: "同调：调整＋调整以外的怪兽1只以上。这张卡同调召唤成功时，这张卡的攻击力上升自己场上存在的2星以下的怪兽的攻击力的合计数值。" },
+                    { id: 34206604, name: "废品弓手", type: "怪兽", attribute: "地", level: 6, atk: 2000, def: 1000, desc: "同调：调整＋调整以外的怪兽1只以上。1回合1次，可以选择对方场上存在的1只怪兽，那只怪兽的控制权直到结束阶段时得到。" },
+                    { id: 66818682, name: "废品狂战士", type: "怪兽", attribute: "地", level: 7, atk: 2700, def: 1800, desc: "同调：调整＋调整以外的怪兽1只以上。这张卡攻击的场合，对方直到伤害步骤结束时不能发动魔法·陷阱卡。" },
+                    { id: 25862681, name: "废品守卫者", type: "怪兽", attribute: "地", level: 6, atk: 1400, def: 2800, desc: "同调：调整＋调整以外的怪兽1只以上。1回合1次，可以选择对方场上表侧表示存在的1只怪兽，那只怪兽的攻击力下降自己墓地存在的名字带有「废品」的怪兽数量×100的数值。" },
+                    { id: 74586817, name: "星尘龙", type: "怪兽", attribute: "风", level: 8, atk: 2500, def: 2000, desc: "同调：调整＋调整以外的怪兽1只以上。持有「把场上的卡破坏的效果」的魔法·陷阱·效果怪兽的效果发动时，可以把这张卡解放让那个发动无效并破坏。" },
+                    { id: 24696097, name: "废品破坏王", type: "怪兽", attribute: "地", level: 8, atk: 2600, def: 2500, desc: "同调：调整＋调整以外的怪兽1只以上。这张卡同调召唤成功时，可以选择最多有作为这张卡的同调素材的怪兽数量的场上存在的卡破坏。" },
+                    { id: 63977008, name: "废品战士", type: "怪兽", attribute: "地", level: 5, atk: 2300, def: 1300, desc: "同调：调整＋调整以外的怪兽1只以上。这张卡同调召唤成功时，这张卡的攻击力上升自己场上存在的2星以下的怪兽的攻击力的合计数值。" },
+                    { id: 44508094, name: "喷气同调士", type: "怪兽", attribute: "炎", level: 1, atk: 500, def: 0, desc: "调整：这张卡被战斗破坏送去墓地时，可以从卡组把1只「废品」怪兽加入手卡。" },
+                    { id: 26202165, name: "速攻同调士", type: "怪兽", attribute: "风", level: 5, atk: 700, def: 1400, desc: "调整：这张卡可以把手卡1只怪兽送去墓地，从手卡特殊召唤。" },
+                    { id: 83994433, name: "废品同调士", type: "怪兽", attribute: "光", level: 3, atk: 1300, def: 500, desc: "调整：这张卡召唤成功时，可以把自己墓地存在的1只2星以下的怪兽表侧守备表示特殊召唤。" },
+                    { id: 72302403, name: "同调解除", type: "魔法", desc: "选择场上表侧表示存在的1只同调怪兽发动。选择的怪兽回到额外卡组。并且，若回到额外卡组的怪兽的同调召唤使用过的一组怪兽在自己墓地齐集，可以把自己墓地的那一组特殊召唤。" },
+                    { id: 19613556, name: "紧急瞬间移动", type: "魔法", desc: "从手卡把1只3星以下的念动力族怪兽特殊召唤。这个效果特殊召唤的怪兽在这个回合的结束阶段时从游戏中除外。" },
+                    { id: 32807846, name: "增援", type: "魔法", desc: "从卡组把1只4星以下的战士族怪兽加入手卡。" },
+                    { id: 5318639, name: "大风暴", type: "魔法", desc: "场上的魔法·陷阱卡全部破坏。" },
+                    { id: 12580477, name: "贪欲之壶", type: "魔法", desc: "选择自己墓地5只怪兽才能发动。选择的5只怪兽加入卡组洗切。那之后，自己从卡组抽2张。" },
+                    { id: 67048711, name: "限制解除", type: "魔法", desc: "自己场上的全部机械族怪兽的攻击力直到回合结束时变成2倍。回合结束时，受到这个效果的怪兽破坏。" },
+                    { id: 19613556, name: "紧急瞬间移动", type: "魔法", desc: "从手卡把1只3星以下的念动力族怪兽特殊召唤。这个效果特殊召唤的怪兽在这个回合的结束阶段时从游戏中除外。" },
+                    { id: 32807846, name: "增援", type: "魔法", desc: "从卡组把1只4星以下的战士族怪兽加入手卡。" },
+                    { id: 5318639, name: "大风暴", type: "魔法", desc: "场上的魔法·陷阱卡全部破坏。" },
+                    { id: 12580477, name: "贪欲之壶", type: "魔法", desc: "选择自己墓地5只怪兽才能发动。选择的5只怪兽加入卡组洗切。那之后，自己从卡组抽2张。" },
+                    { id: 67048711, name: "限制解除", type: "魔法", desc: "自己场上的全部机械族怪兽的攻击力直到回合结束时变成2倍。回合结束时，受到这个效果的怪兽破坏。" },
+                    { id: 72302403, name: "同调解除", type: "魔法", desc: "选择场上表侧表示存在的1只同调怪兽发动。选择的怪兽回到额外卡组。并且，若回到额外卡组的怪兽的同调召唤使用过的一组怪兽在自己墓地齐集，可以把自己墓地的那一组特殊召唤。" },
+                    { id: 41482598, name: "废铁稻草人", type: "陷阱", desc: "对方怪兽的直接攻击宣言时才能发动。那1只攻击怪兽的攻击无效。发动后这张卡不送去墓地，直接盖放。" },
+                    { id: 53582587, name: "神圣防护罩-反射镜力-", type: "陷阱", desc: "对方怪兽的攻击宣言时才能发动。对方场上的攻击表示怪兽全部破坏。" },
+                    { id: 44095762, name: "神之宣告", type: "陷阱", desc: "把基本分支付一半发动。魔法·陷阱卡的发动，怪兽的召唤·反转召唤·特殊召唤的其中1个无效并破坏。" },
+                    { id: 41482598, name: "废铁稻草人", type: "陷阱", desc: "对方怪兽的直接攻击宣言时才能发动。那1只攻击怪兽的攻击无效。发动后这张卡不送去墓地，直接盖放。" },
+                    { id: 53582587, name: "神圣防护罩-反射镜力-", type: "陷阱", desc: "对方怪兽的攻击宣言时才能发动。对方场上的攻击表示怪兽全部破坏。" },
+                    { id: 44095762, name: "神之宣告", type: "陷阱", desc: "把基本分支付一半发动。魔法·陷阱卡的发动，怪兽的召唤·反转召唤·特殊召唤的其中1个无效并破坏。" }
+                ],
+                extra: [
+                    { id: 74586817, name: "星尘龙", type: "怪兽", attribute: "风", level: 8, atk: 2500, def: 2000, desc: "同调：调整＋调整以外的怪兽1只以上。持有「把场上的卡破坏的效果」的魔法·陷阱·效果怪兽的效果发动时，可以把这张卡解放让那个发动无效并破坏。" },
+                    { id: 24696097, name: "废品破坏王", type: "怪兽", attribute: "地", level: 8, atk: 2600, def: 2500, desc: "同调：调整＋调整以外的怪兽1只以上。这张卡同调召唤成功时，可以选择最多有作为这张卡的同调素材的怪兽数量的场上存在的卡破坏。" },
+                    { id: 25862681, name: "废品守卫者", type: "怪兽", attribute: "地", level: 6, atk: 1400, def: 2800, desc: "同调：调整＋调整以外的怪兽1只以上。1回合1次，可以选择对方场上表侧表示存在的1只怪兽，那只怪兽的攻击力下降自己墓地存在的名字带有「废品」的怪兽数量×100的数值。" },
+                    { id: 34206604, name: "废品弓手", type: "怪兽", attribute: "地", level: 6, atk: 2000, def: 1000, desc: "同调：调整＋调整以外的怪兽1只以上。1回合1次，可以选择对方场上存在的1只怪兽，那只怪兽的控制权直到结束阶段时得到。" },
+                    { id: 66818682, name: "废品狂战士", type: "怪兽", attribute: "地", level: 7, atk: 2700, def: 1800, desc: "同调：调整＋调整以外的怪兽1只以上。这张卡攻击的场合，对方直到伤害步骤结束时不能发动魔法·陷阱卡。" },
+                    { id: 70902743, name: "废品战士", type: "怪兽", attribute: "地", level: 5, atk: 2300, def: 1300, desc: "同调：调整＋调整以外的怪兽1只以上。这张卡同调召唤成功时，这张卡的攻击力上升自己场上存在的2星以下的怪兽的攻击力的合计数值。" },
+                    { id: 63977008, name: "废品战士", type: "怪兽", attribute: "地", level: 5, atk: 2300, def: 1300, desc: "同调：调整＋调整以外的怪兽1只以上。这张卡同调召唤成功时，这张卡的攻击力上升自己场上存在的2星以下的怪兽的攻击力的合计数值。" },
+                    { id: 25862681, name: "废品守卫者", type: "怪兽", attribute: "地", level: 6, atk: 1400, def: 2800, desc: "同调：调整＋调整以外的怪兽1只以上。1回合1次，可以选择对方场上表侧表示存在的1只怪兽，那只怪兽的攻击力下降自己墓地存在的名字带有「废品」的怪兽数量×100的数值。" },
+                    { id: 34206604, name: "废品弓手", type: "怪兽", attribute: "地", level: 6, atk: 2000, def: 1000, desc: "同调：调整＋调整以外的怪兽1只以上。1回合1次，可以选择对方场上存在的1只怪兽，那只怪兽的控制权直到结束阶段时得到。" },
+                    { id: 66818682, name: "废品狂战士", type: "怪兽", attribute: "地", level: 7, atk: 2700, def: 1800, desc: "同调：调整＋调整以外的怪兽1只以上。这张卡攻击的场合，对方直到伤害步骤结束时不能发动魔法·陷阱卡。" },
+                    { id: 70902743, name: "废品战士", type: "怪兽", attribute: "地", level: 5, atk: 2300, def: 1300, desc: "同调：调整＋调整以外的怪兽1只以上。这张卡同调召唤成功时，这张卡的攻击力上升自己场上存在的2星以下的怪兽的攻击力的合计数值。" },
+                    { id: 63977008, name: "废品战士", type: "怪兽", attribute: "地", level: 5, atk: 2300, def: 1300, desc: "同调：调整＋调整以外的怪兽1只以上。这张卡同调召唤成功时，这张卡的攻击力上升自己场上存在的2星以下的怪兽的攻击力的合计数值。" },
+                    { id: 25862681, name: "废品守卫者", type: "怪兽", attribute: "地", level: 6, atk: 1400, def: 2800, desc: "同调：调整＋调整以外的怪兽1只以上。1回合1次，可以选择对方场上表侧表示存在的1只怪兽，那只怪兽的攻击力下降自己墓地存在的名字带有「废品」的怪兽数量×100的数值。" },
+                    { id: 34206604, name: "废品弓手", type: "怪兽", attribute: "地", level: 6, atk: 2000, def: 1000, desc: "同调：调整＋调整以外的怪兽1只以上。1回合1次，可以选择对方场上存在的1只怪兽，那只怪兽的控制权直到结束阶段时得到。" },
+                    { id: 66818682, name: "废品狂战士", type: "怪兽", attribute: "地", level: 7, atk: 2700, def: 1800, desc: "同调：调整＋调整以外的怪兽1只以上。这张卡攻击的场合，对方直到伤害步骤结束时不能发动魔法·陷阱卡。" }
+                ],
+                avatar: "https://images.ygoprodeck.com/images/cards_cropped/10000000.jpg",
+                strategy: "yusei"
+            },
+            // 其他角色卡组类似...
+        };
+        
+        // 角色策略
+        const characterStrategies = {
+            yusei: {
+                name: "不动游星",
+                playStyle: "擅长使用废品系列和同调召唤，快速展开场上的怪兽",
+                preferredSummon: "同调召唤",
+                favoriteCards: ["废品同调士", "星尘龙"],
+                behavior: function() {
+                    // 游星的AI策略
+                    if (gameState.phase === "draw") {
+                        // 抽卡阶段
+                        drawCard("opponent");
+                        setTimeout(() => {
+                            gameState.phase = "main1";
+                            updatePhaseIndicator();
+                            this.behavior();
+                        }, 1000);
+                        return;
+                    }
+                    
+                    if (gameState.phase === "main1") {
+                        // 主要阶段1 - 尝试召唤和同调
+                        const hand = gameState.opponent.hand;
+                        const monsters = gameState.opponent.monsters;
+                        
+                        // 检查是否有可以召唤的调整怪兽
+                        const tuners = hand.filter(card => card.name.includes("同调士"));
+                        if (tuners.length > 0) {
+                            // 尝试召唤调整怪兽
+                            const tuner = tuners[0];
+                            const emptySlot = monsters.findIndex(slot => slot === null);
+                            if (emptySlot !== -1) {
+                                // 召唤调整怪兽
+                                summonMonster("opponent", tuner, emptySlot);
+                                setTimeout(() => {
+                                    this.behavior();
+                                }, 1500);
+                                return;
+                            }
+                        }
+                        
+                        // 检查是否可以同调召唤
+                        if (monsters.filter(m => m !== null).length >= 2) {
+                            const tunerOnField = monsters.find(m => m && m.name.includes("同调士"));
+                            const nonTuners = monsters.filter(m => m && !m.name.includes("同调士"));
+                            
+                            if (tunerOnField && nonTuners.length > 0) {
+                                // 计算总星级
+                                const totalLevel = tunerOnField.level + nonTuners[0].level;
+                                
+                                // 查找合适的同调怪兽
+                                const possibleSynchros = gameState.opponent.extraDeck.filter(
+                                    card => card.level === totalLevel
+                                );
+                                
+                                if (possibleSynchros.length > 0) {
+                                    // 进行同调召唤
+                                    const synchroMonster = possibleSynchros[0];
+                                    const emptySlot = monsters.findIndex(slot => slot === null);
+                                    
+                                    if (emptySlot !== -1) {
+                                        // 从额外卡组移除同调怪兽
+                                        gameState.opponent.extraDeck = gameState.opponent.extraDeck.filter(
+                                            card => card.id !== synchroMonster.id
+                                        );
+                                        
+                                        // 将素材送入墓地
+                                        const tunerIndex = monsters.findIndex(m => m && m.id === tunerOnField.id);
+                                        const nonTunerIndex = monsters.findIndex(m => m && m.id === nonTuners[0].id);
+                                        
+                                        gameState.opponent.graveyard.push(monsters[tunerIndex]);
+                                        gameState.opponent.graveyard.push(monsters[nonTunerIndex]);
+                                        
+                                        monsters[tunerIndex] = null;
+                                        monsters[nonTunerIndex] = null;
+                                        
+                                        // 召唤同调怪兽
+                                        monsters[emptySlot] = synchroMonster;
+                                        
+                                        // 更新UI
+                                        updateOpponentField();
+                                        updateGraveyardCount("opponent");
+                                        updateExtraDeckCount("opponent");
+                                        
+                                        // 显示同调动画
+                                        const slotElement = document.getElementById(`opponent-monster-${emptySlot + 1}`);
+                                        slotElement.classList.add("synchro-summon");
+                                        setTimeout(() => {
+                                            slotElement.classList.remove("synchro-summon");
+                                            
+                                            // 继续AI行动
+                                            setTimeout(() => {
+                                                this.behavior();
+                                            }, 1000);
+                                        }, 1000);
+                                        
+                                        return;
+                                    }
+                                }
+                            }
+                        }
+                        
+                        // 如果没有其他操作，进入战斗阶段
+                        setTimeout(() => {
+                            gameState.phase = "battle";
+                            updatePhaseIndicator();
+                            this.behavior();
+                        }, 1000);
+                        return;
+                    }
+                    
+                    if (gameState.phase === "battle") {
+                        // 战斗阶段 - 攻击玩家怪兽
+                        const opponentMonsters = gameState.opponent.monsters.filter(m => m !== null);
+                        const playerMonsters = gameState.player.monsters.filter(m => m !== null);
+                        
+                        if (opponentMonsters.length > 0) {
+                            // 选择攻击力最高的怪兽攻击
+                            opponentMonsters.sort((a, b) => b.atk - a.atk);
+                            const attacker = opponentMonsters[0];
+                            const attackerIndex = gameState.opponent.monsters.findIndex(m => m && m.id === attacker.id);
+                            
+                            if (playerMonsters.length > 0) {
+                                // 攻击玩家怪兽
+                                playerMonsters.sort((a, b) => a.atk - b.atk);
+                                const target = playerMonsters[0];
+                                const targetIndex = gameState.player.monsters.findIndex(m => m && m.id === target.id);
+                                
+                                // 计算战斗结果
+                                if (attacker.atk > target.atk) {
+                                    // 对手怪兽攻击力更高
+                                    const damage = attacker.atk - target.atk;
+                                    gameState.player.lp -= damage;
+                                    updateLP("player");
+                                    
+                                    // 破坏玩家怪兽
+                                    gameState.player.graveyard.push(target);
+                                    gameState.player.monsters[targetIndex] = null;
+                                    
+                                    // 更新UI
+                                    updatePlayerField();
+                                    updateGraveyardCount("player");
+                                    
+                                    // 显示伤害动画
+                                    document.getElementById("player-lp").classList.add("damage-animation");
+                                    setTimeout(() => {
+                                        document.getElementById("player-lp").classList.remove("damage-animation");
+                                        
+                                        // 继续AI行动
+                                        setTimeout(() => {
+                                            this.behavior();
+                                        }, 1000);
+                                    }, 500);
+                                } else if (attacker.atk < target.atk) {
+                                    // 玩家怪兽攻击力更高
+                                    const damage = target.atk - attacker.atk;
+                                    gameState.opponent.lp -= damage;
+                                    updateLP("opponent");
+                                    
+                                    // 破坏对手怪兽
+                                    gameState.opponent.graveyard.push(attacker);
+                                    gameState.opponent.monsters[attackerIndex] = null;
+                                    
+                                    // 更新UI
+                                    updateOpponentField();
+                                    updateGraveyardCount("opponent");
+                                    
+                                    // 显示伤害动画
+                                    document.getElementById("opponent-lp").classList.add("damage-animation");
+                                    setTimeout(() => {
+                                        document.getElementById("opponent-lp").classList.remove("damage-animation");
+                                        
+                                        // 继续AI行动
+                                        setTimeout(() => {
+                                            this.behavior();
+                                        }, 1000);
+                                    }, 500);
+                                } else {
+                                    // 攻击力相同，双方怪兽都被破坏
+                                    gameState.player.graveyard.push(target);
+                                    gameState.player.monsters[targetIndex] = null;
+                                    
+                                    gameState.opponent.graveyard.push(attacker);
+                                    gameState.opponent.monsters[attackerIndex] = null;
+                                    
+                                    // 更新UI
+                                    updatePlayerField();
+                                    updateOpponentField();
+                                    updateGraveyardCount("player");
+                                    updateGraveyardCount("opponent");
+                                    
+                                    // 继续AI行动
+                                    setTimeout(() => {
+                                        this.behavior();
+                                    }, 1000);
+                                }
+                            } else {
+                                // 直接攻击玩家
+                                gameState.player.lp -= attacker.atk;
+                                updateLP("player");
+                                
+                                // 显示伤害动画
+                                document.getElementById("player-lp").classList.add("damage-animation");
+                                setTimeout(() => {
+                                    document.getElementById("player-lp").classList.remove("damage-animation");
+                                    
+                                    // 继续AI行动
+                                    setTimeout(() => {
+                                        this.behavior();
+                                    }, 1000);
+                                }, 500);
+                            }
+                        } else {
+                            // 没有怪兽可以攻击，进入结束阶段
+                            setTimeout(() => {
+                                gameState.phase = "end";
+                                updatePhaseIndicator();
+                                this.behavior();
+                            }, 1000);
+                        }
+                        return;
+                    }
+                    
+                    if (gameState.phase === "end") {
+                        // 结束阶段 - 切换回合
+                        setTimeout(() => {
+                            endOpponentTurn();
+                        }, 1000);
+                    }
+                }
+            },
+            // 其他角色策略类似...
+        };
+        
+        // 初始化游戏
+        function initGame() {
+            // 设置事件监听器
+            document.querySelectorAll('.character-select').forEach(el => {
+                el.addEventListener('click', selectCharacter);
+            });
+            
+            document.getElementById('start-duel-btn').addEventListener('click', startDuel);
+            document.getElementById('draw-btn').addEventListener('click', drawCardForPlayer);
+            document.getElementById('summon-btn').addEventListener('click', showSummonOptions);
+            document.getElementById('synchro-btn').addEventListener('click', showSynchroOptions);
+            document.getElementById('attack-btn').addEventListener('click', showAttackOptions);
+            document.getElementById('end-phase-btn').addEventListener('click', endPlayerTurn);
+            document.getElementById('surrender-btn').addEventListener('click', surrender);
+            document.getElementById('rematch-btn').addEventListener('click', rematch);
+            document.getElementById('back-to-menu-btn').addEventListener('click', backToMenu);
+            document.getElementById('close-detail-btn').addEventListener('click', closeCardDetail);
+            
+            // 初始化卡牌点击事件
+            initCardInteractions();
+        }
+        
+        // 选择角色
+        function selectCharacter(e) {
+            const characterElement = e.currentTarget;
+            const character = characterElement.getAttribute('data-character');
+            
+            // 移除之前的选择
+            document.querySelectorAll('.character-select').forEach(el => {
+                el.classList.remove('selected-character');
+            });
+            
+            // 添加新选择
+            characterElement.classList.add('selected-character');
+            
+            // 保存选择
+            gameState.selectedOpponent = character;
+        }
+        
+        // 开始决斗
+        function startDuel() {
+            if (!gameState.selectedOpponent) {
+                alert('请选择你的对手！');
+                return;
+            }
+            
+            // 隐藏角色选择界面
+            document.getElementById('character-select').classList.add('hidden');
+            
+            // 显示游戏界面
+            document.getElementById('game-container').classList.remove('hidden');
+            
+            // 设置对手信息
+            const opponent = characterStrategies[gameState.selectedOpponent];
+            gameState.opponent.name = opponent.name;
+            gameState.opponent.character = gameState.selectedOpponent;
+            
+            // 设置玩家信息
+            gameState.player.name = "玩家";
+            
+            // 更新UI
+            document.getElementById('opponent-name').textContent = opponent.name;
+            document.getElementById('player-name').textContent = "玩家";
+            
+            // 加载卡组
+            loadDecks();
+            
+            // 开始游戏
+            startGame();
+        }
+        
+        // 加载卡组
+        function loadDecks() {
+            // 玩家卡组 (简化版)
+            gameState.player.deck = [
+                { id: 83994433, name: "废品同调士", type: "怪兽", attribute: "光", level: 3, atk: 1300, def: 500, desc: "调整：这张卡召唤成功时，可以把自己墓地存在的1只2星以下的怪兽表侧守备表示特殊召唤。" },
+                { id: 26202165, name: "速攻同调士", type: "怪兽", attribute: "风", level: 5, atk: 700, def: 1400, desc: "调整：这张卡可以把手卡1只怪兽送去墓地，从手卡特殊召唤。" },
+                { id: 44508094, name: "喷气同调士", type: "怪兽", attribute: "炎", level: 1, atk: 500, def: 0, desc: "调整：这张卡被战斗破坏送去墓地时，可以从卡组把1只「废品」怪兽加入手卡。" },
+                { id: 63977008, name: "废品战士", type: "怪兽", attribute: "地", level: 5, atk: 2300, def: 1300, desc: "同调：调整＋调整以外的怪兽1只以上。这张卡同调召唤成功时，这张卡的攻击力上升自己场上存在的2星以下的怪兽的攻击力的合计数值。" },
+                { id: 24696097, name: "废品破坏王", type: "怪兽", attribute: "地", level: 8, atk: 2600, def: 2500, desc: "同调：调整＋调整以外的怪兽1只以上。这张卡同调召唤成功时，可以选择最多有作为这张卡的同调素材的怪兽数量的场上存在的卡破坏。" },
+                { id: 74586817, name: "星尘龙", type: "怪兽", attribute: "风", level: 8, atk: 2500, def: 2000, desc: "同调：调整＋调整以外的怪兽1只以上。持有「把场上的卡破坏的效果」的魔法·陷阱·效果怪兽的效果发动时，可以把这张卡解放让那个发动无效并破坏。" },
+                // 更多卡牌...
+            ];
+            
+            // 玩家额外卡组
+            gameState.player.extraDeck = [
+                { id: 74586817, name: "星尘龙", type: "怪兽", attribute: "风", level: 8, atk: 2500, def: 2000, desc: "同调：调整＋调整以外的怪兽1只以上。持有「把场上的卡破坏的效果」的魔法·陷阱·效果怪兽的效果发动时，可以把这张卡解放让那个发动无效并破坏。" },
+                { id: 24696097, name: "废品破坏王", type: "怪兽", attribute: "地", level: 8, atk: 2600, def: 2500, desc: "同调：调整＋调整以外的怪兽1只以上。这张卡同调召唤成功时，可以选择最多有作为这张卡的同调素材的怪兽数量的场上存在的卡破坏。" },
+                // 更多额外卡组卡牌...
+            ];
+            
+            // 对手卡组
+            const opponentDeck = cardDatabase[gameState.selectedOpponent];
+            gameState.opponent.deck = [...opponentDeck.deck];
+            gameState.opponent.extraDeck = [...opponentDeck.extra];
+            
+            // 洗牌
+            shuffleDeck("player");
+            shuffleDeck("opponent");
+            
+            // 更新卡组数量显示
+            updateDeckCount("player");
+            updateDeckCount("opponent");
+            updateExtraDeckCount("player");
+            updateExtraDeckCount("opponent");
+            
+            // 设置头像
+            document.getElementById('opponent-avatar').src = opponentDeck.avatar;
+            document.getElementById('player-avatar').src = "https://images.ygoprodeck.com/images/cards_cropped/10000000.jpg";
+        }
+        
+        // 洗牌
+        function shuffleDeck(player) {
+            const deck = gameState[player].deck;
+            for (let i = deck.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [deck[i], deck[j]] = [deck[j], deck[i]];
+            }
+        }
+        
+        // 开始游戏
+        function startGame() {
+            // 重置游戏状态
+            gameState.player.lp = 8000;
+            gameState.opponent.lp = 8000;
+            gameState.player.hand = [];
+            gameState.opponent.hand = [];
+            gameState.player.monsters = [null, null, null, null, null];
+            gameState.opponent.monsters = [null, null, null, null, null];
+            gameState.player.spells = [null, null, null, null, null];
+            gameState.opponent.spells = [null, null, null, null, null];
+            gameState.player.graveyard = [];
+            gameState.opponent.graveyard = [];
+            gameState.player.banished = [];
+            gameState.opponent.banished = [];
+            gameState.turn = "player";
+            gameState.phase = "draw";
+            
+            // 更新UI
+            updateLP("player");
+            updateLP("opponent");
+            updatePlayerField();
+            updateOpponentField();
+            updateGraveyardCount("player");
+            updateGraveyardCount("opponent");
+            updateBanishedCount("player");
+            updateBanishedCount("opponent");
+            updatePhaseIndicator();
+            
+            // 初始抽牌 (5张)
+            for (let i = 0; i < 5; i++) {
+                drawCard("player");
+                drawCard("opponent");
+            }
+            
+            // 玩家先手
+            startPlayerTurn();
+        }
+        
+        // 抽卡
+        function drawCard(player) {
+            if (gameState[player].deck.length === 0) {
+                // 卡组为空，游戏结束
+                gameOver(player === "player" ? "opponent" : "player", "卡组抽空");
+                return;
+            }
+            
+            const card = gameState[player].deck.pop();
+            gameState[player].hand.push(card);
+            
+            // 更新UI
+            if (player === "player") {
+                updatePlayerHand();
+                updateDeckCount("player");
+            } else {
+                updateDeckCount("opponent");
+            }
+        }
+        
+        // 玩家抽卡
+        function drawCardForPlayer() {
+            if (gameState.turn !== "player" || gameState.phase !== "draw") {
+                alert("现在不能抽卡！");
+                return;
+            }
+            
+            drawCard("player");
+            gameState.phase = "main1";
+            updatePhaseIndicator();
+        }
+        
+        // 召唤怪兽
+        function summonMonster(player, card, slotIndex) {
+            // 从手牌移除
+            const hand = gameState[player].hand;
+            const cardIndex = hand.findIndex(c => c.id === card.id);
+            if (cardIndex !== -1) {
+                hand.splice(cardIndex, 1);
+            }
+            
+            // 放置到怪兽区
+            gameState[player].monsters[slotIndex] = card;
+            
+            // 更新UI
+            if (player === "player") {
+                updatePlayerHand();
+                updatePlayerField();
+            } else {
+                updateOpponentField();
+            }
+        }
+        
+        // 显示召唤选项
+        function showSummonOptions() {
+            if (gameState.turn !== "player" || gameState.phase !== "main1") {
+                alert("现在不能召唤怪兽！");
+                return;
+            }
+            
+            const summonableMonsters = gameState.player.hand.filter(card => card.type === "怪兽");
+            
+            if (summonableMonsters.length === 0) {
+                alert("手牌中没有可召唤的怪兽！");
+                return;
+            }
+            
+            // 清空手牌点击事件
+            clearCardInteractions();
+            
+            // 显示可召唤的怪兽
+            summonableMonsters.forEach(card => {
+                const cardElement = document.querySelector(`.hand-card[data-id="${card.id}"]`);
+                if (cardElement) {
+                    cardElement.classList.add('cursor-pointer', 'border-2', 'border-yellow-400');
+                    cardElement.addEventListener('click', () => selectMonsterForSummon(card));
+                }
+            });
+            
+            // 显示取消按钮
+            const cancelBtn = document.createElement('button');
+            cancelBtn.className = 'bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-bold mt-4';
+            cancelBtn.innerHTML = '<i class="fas fa-times mr-2"></i>取消召唤';
+            cancelBtn.addEventListener('click', cancelSummon);
+            
+            const handContainer = document.getElementById('player-hand');
+            handContainer.appendChild(cancelBtn);
+        }
+        
+        // 选择怪兽进行召唤
+        function selectMonsterForSummon(card) {
+            gameState.player.selectedCard = card;
+            
+            // 显示可用的怪兽区
+            const monsterSlots = document.querySelectorAll('[id^="player-monster-"]');
+            monsterSlots.forEach((slot, index) => {
+                if (!gameState.player.monsters[index]) {
+                    slot.classList.add('cursor-pointer', 'border-2', 'border-blue-400');
+                    slot.addEventListener('click', () => confirmSummon(index));
+                }
+            });
+        }
+        
+        // 确认召唤
+        function confirmSummon(slotIndex) {
+            summonMonster("player", gameState.player.selectedCard, slotIndex);
+            cancelSummon();
+            
+            // 重新初始化卡牌交互
+            initCardInteractions();
+        }
+        
+        // 取消召唤
+        function cancelSummon() {
+            // 移除高亮
+            document.querySelectorAll('.hand-card').forEach(card => {
+                card.classList.remove('cursor-pointer', 'border-2', 'border-yellow-400');
+            });
+            
+            document.querySelectorAll('[id^="player-monster-"]').forEach(slot => {
+                slot.classList.remove('cursor-pointer', 'border-2', 'border-blue-400');
+            });
+            
+            // 移除取消按钮
+            const cancelBtn = document.querySelector('#player-hand button');
+            if (cancelBtn) {
+                cancelBtn.remove();
+            }
+            
+            gameState.player.selectedCard = null;
+        }
+        
+        // 显示同调召唤选项
+        function showSynchroOptions() {
+            if (gameState.turn !== "player" || gameState.phase !== "main1") {
+                alert("现在不能进行同调召唤！");
+                return;
+            }
+            
+            // 检查场上有调整和非调整怪兽
+            const tuners = gameState.player.monsters.filter(m => m && m.name.includes("同调士"));
+            const nonTuners = gameState.player.monsters.filter(m => m && !m.name.includes("同调士"));
+            
+            if (tuners.length === 0 || nonTuners.length === 0) {
+                alert("场上没有合适的同调素材！");
+                return;
+            }
+            
+            // 计算总星级
+            const totalLevel = tuners[0].level + nonTuners[0].level;
+            
+            // 检查额外卡组是否有合适的同调怪兽
+            const possibleSynchros = gameState.player.extraDeck.filter(
+                card => card.level === totalLevel
+            );
+            
+            if (possibleSynchros.length === 0) {
+                alert("额外卡组中没有合适的同调怪兽！");
+                return;
+            }
+            
+            // 显示同调怪兽选择
+            showSynchroMonsterSelection(possibleSynchros);
+        }
+        
+        // 显示同调怪兽选择
+        function showSynchroMonsterSelection(synchroMonsters) {
+            // 创建选择界面
+            const selectionDiv = document.createElement('div');
+            selectionDiv.className = 'fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50';
+            selectionDiv.id = 'synchro-selection';
+            
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'bg-gray-900 rounded-lg p-6 max-w-2xl w-full';
+            
+            const title = document.createElement('h3');
+            title.className = 'text-xl font-bold mb-4 text-yellow-400';
+            title.textContent = '选择同调怪兽';
+            contentDiv.appendChild(title);
+            
+            const cardsContainer = document.createElement('div');
+            cardsContainer.className = 'grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-4';
+            
+            // 添加同调怪兽选项
+            synchroMonsters.forEach(monster => {
+                const cardDiv = document.createElement('div');
+                cardDiv.className = 'bg-gray-800 rounded-lg p-3 cursor-pointer hover:bg-gray-700';
+                cardDiv.innerHTML = `
+                    <div class="h-32 bg-gray-700 rounded mb-
+</html>
